@@ -23,11 +23,27 @@ func main() {
 	fmt.Printf("Loaded %d HLS snapshots\n", len(snapshots))
 
 	for i, snapshot := range snapshots {
+		p, err := hls.ParsePlaylist(snapshot.Manifest)
+		if err != nil {
+			log.Fatalf("snapshot %d: %v", i, err)
+		}
+
 		fmt.Printf(
-			"Snapshot %d: %s (%d bytes)\n",
+			"Snapshot %d: sequence=%d, segments=%d",
 			i,
-			snapshot.Timestamp,
-			len(snapshot.Manifest),
+			p.MediaSequence,
+			len(p.Segments),
 		)
+
+		if p.AdBreak != nil {
+			fmt.Printf(
+				", adBreak=%.3fs, active=%t",
+				p.AdBreak.Duration,
+				p.AdBreak.Active,
+			)
+		}
+
+		fmt.Println()
 	}
+
 }
