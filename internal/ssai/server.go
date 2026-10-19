@@ -5,8 +5,10 @@ import (
 	"net/http"
 	"os"
 	"sync"
+	"time"
 
 	"github.com/rayning0/ssai/internal/hls"
+	"github.com/rayning0/ssai/internal/tracking"
 )
 
 // Server serves a viewer-facing HLS playlist. Updates are supplied by either a
@@ -15,6 +17,7 @@ type Server struct {
 	AdSegmentURL string
 	AdMediaPath  string
 	SourceURL    string
+	Tracker      *tracking.Tracker
 
 	mu        sync.RWMutex
 	playlist  *hls.Playlist
@@ -86,6 +89,14 @@ func (s *Server) handlePlaylist(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleAdSegment(w http.ResponseWriter, r *http.Request) {
+	if s.Tracker != nil {
+		// This creative is one six-second stitched segment. A real service would
+		// use its ad-instance metadata and segment position from the manifest.
+		_ = s.Tracker.Observe(tracking.SegmentRequest{
+			SessionID: r.URL.Query().Get("session"), AdInstanceID: r.URL.Query().Get("ad_instance"),
+			SegmentDuration: 6 * time.Second, AdDuration: 6 * time.Second,
+		})
+	}
 	w.Header().Set("Content-Type", "video/mp2t")
 	http.ServeFile(w, r, s.AdMediaPath)
 }

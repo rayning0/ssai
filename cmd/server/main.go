@@ -11,6 +11,7 @@ import (
 
 	"github.com/rayning0/ssai/internal/hls"
 	"github.com/rayning0/ssai/internal/ssai"
+	"github.com/rayning0/ssai/internal/tracking"
 )
 
 const liveWCVBURL = "https://aegis-cloudfront-1.tubi.video/c2e3094d-ad56-4c5f-9655-cd80df71fbab/playlist_1280x720.m3u8"
@@ -26,7 +27,10 @@ func main() {
 	if err := ssai.CheckAdMedia("testdata/ad/ad000.ts"); err != nil {
 		log.Fatal("ad media missing: ", err)
 	}
-	server := ssai.NewServer(*sourceURL, "http://localhost:8080/ads/ad-001.ts", "testdata/ad/ad000.ts")
+	pixelTracker := tracking.New(logPixelSender{}, 100)
+	defer pixelTracker.Close()
+	server := ssai.NewServer(*sourceURL, "http://localhost:8080/ads/ad-001.ts?session=demo-viewer&ad_instance=demo-ad-001", "testdata/ad/ad000.ts")
+	server.Tracker = pixelTracker
 	switch *mode {
 	case "fixture":
 		if err := loadFixture(server, *fixture); err != nil {
@@ -47,6 +51,13 @@ func main() {
 	}
 	fmt.Printf("SSAI server (%s mode) at http://localhost%s/live/wcvb.m3u8\n", *mode, *addr)
 	log.Fatal(http.ListenAndServe(*addr, server.Handler()))
+}
+
+type logPixelSender struct{}
+
+func (logPixelSender) Send(_ context.Context, event tracking.Event) error {
+	log.Printf("pixel sent session=%s ad_instance=%s event=%s", event.SessionID, event.AdInstanceID, event.Type)
+	return nil
 }
 
 func loadFixture(server *ssai.Server, path string) error {
