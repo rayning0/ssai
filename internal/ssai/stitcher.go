@@ -2,6 +2,7 @@ package ssai
 
 import (
 	"fmt"
+	"net/url"
 	"strings"
 
 	"github.com/rayning0/ssai/internal/hls"
@@ -12,6 +13,69 @@ type StitchRequest struct {
 	ReplaceSequence int64
 	AdSegmentURL    string
 	SourceBaseURL   string
+}
+
+// StitchManifest preserves source HLS tags while resolving source media URIs
+// to the origin. A negative replaceSequence performs only that URI rewrite,
+// which is the safe fallback when no ad break is currently available.
+func StitchManifest(manifest string, playlist *hls.Playlist, replaceSequence int64, adURL, sourceURL string) (string, error) {
+	if playlist == nil {
+		return "", fmt.Errorf("nil playlist")
+	}
+	base, err := url.Parse(sourceURL)
+	if err != nil {
+		return "", fmt.Errorf("parse source URL: %w", err)
+	}
+	var out strings.Builder
+	var pending []string
+	segmentIndex := 0
+	for _, line := range strings.Split(manifest, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" || strings.HasPrefix(trimmed, "#") {
+			pending = append(pending, line)
+			continue
+		}
+		if segmentIndex >= len(playlist.Segments) {
+			return "", fmt.Errorf("more media URIs than parsed segments")
+		}
+		segment := playlist.Segments[segmentIndex]
+		segmentIndex++
+		if segment.Sequence == replaceSequence {
+			if !segment.InAdBreak {
+				return "", fmt.Errorf("sequence %d is not inside an ad break", segment.Sequence)
+			}
+			extinf := len(pending)
+			for i := len(pending) - 1; i >= 0; i-- {
+				if strings.HasPrefix(strings.TrimSpace(pending[i]), "#EXTINF:") {
+					extinf = i
+					break
+				}
+			}
+			for _, pendingLine := range pending[:extinf] {
+				fmt.Fprintln(&out, pendingLine)
+			}
+			fmt.Fprintln(&out, "#EXT-X-DISCONTINUITY")
+			for _, pendingLine := range pending[extinf:] {
+				fmt.Fprintln(&out, pendingLine)
+			}
+			fmt.Fprintln(&out, adURL)
+			fmt.Fprintln(&out, "#EXT-X-DISCONTINUITY")
+		} else {
+			for _, pendingLine := range pending {
+				fmt.Fprintln(&out, pendingLine)
+			}
+			uri, err := url.Parse(trimmed)
+			if err != nil {
+				return "", fmt.Errorf("parse segment URL: %w", err)
+			}
+			fmt.Fprintln(&out, base.ResolveReference(uri).String())
+		}
+		pending = pending[:0]
+	}
+	for _, pendingLine := range pending {
+		fmt.Fprintln(&out, pendingLine)
+	}
+	return out.String(), nil
 }
 
 func Stitch(req StitchRequest) (string, error) {
