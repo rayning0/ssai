@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/rayning0/ssai/internal/hls"
+	"github.com/rayning0/ssai/internal/ssai"
 )
 
 func main() {
@@ -20,30 +21,49 @@ func main() {
 		log.Fatal(err)
 	}
 
+	channel := ssai.NewChannelState("wcvb")
+
 	fmt.Printf("Loaded %d HLS snapshots\n", len(snapshots))
 
 	for i, snapshot := range snapshots {
-		p, err := hls.ParsePlaylist(snapshot.Manifest)
+		playlist, err := hls.ParsePlaylist(snapshot.Manifest)
 		if err != nil {
-			log.Fatalf("snapshot %d: %v", i, err)
+			log.Fatalf("parsing snapshot %d: %v", i, err)
+		}
+
+		before := len(channel.Segments)
+
+		if err := channel.Ingest(playlist); err != nil {
+			log.Fatalf("ingesting snapshot %d: %v", i, err)
 		}
 
 		fmt.Printf(
-			"Snapshot %d: sequence=%d, segments=%d",
+			"Snapshot %2d: received=%2d new=%2d total=%2d\n",
 			i,
-			p.MediaSequence,
-			len(p.Segments),
+			len(playlist.Segments),
+			len(channel.Segments)-before,
+			len(channel.Segments),
 		)
-
-		if p.AdBreak != nil {
-			fmt.Printf(
-				", adBreak=%.3fs, active=%t",
-				p.AdBreak.Duration,
-				p.AdBreak.Active,
-			)
-		}
-
-		fmt.Println()
 	}
 
+	fmt.Println("\nAd breaks:")
+
+	for _, b := range channel.AdBreaks {
+		fmt.Printf(
+			"ID=%s duration=%.3f observedThrough=%.3f "+
+				"remaining=%.3f ended=%t firstObservedSeq=%d\n",
+			b.ID,
+			b.Duration,
+			b.ObservedThrough,
+			b.Remaining(),
+			b.Ended,
+			b.FirstObservedSequence,
+		)
+	}
+
+	fmt.Printf(
+		"\nUnique segments: %d\nLast sequence: %d\n",
+		len(channel.Segments),
+		channel.LastSequence,
+	)
 }

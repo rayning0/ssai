@@ -7,6 +7,7 @@ type Segment struct {
 
 	InAdBreak bool
 	AdElapsed float64
+	BreakID   string
 }
 
 type AdBreak struct {
