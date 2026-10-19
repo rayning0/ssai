@@ -126,4 +126,21 @@ func main() {
 			)
 		}
 	}
+
+	playlist, err := hls.ParsePlaylist(snapshots[0].Manifest)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	stitched, err := ssai.Stitch(ssai.StitchRequest{
+		Playlist:        playlist,
+		ReplaceSequence: 341361,
+		AdSegmentURL:    "http://localhost:8080/ads/ad-001.ts",
+		SourceBaseURL:   "https://aegis-cloudfront-1.tubi.video/c2e3094d-ad56-4c5f-9655-cd80df71fbab/",
+	})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Println("\nStitched manifest:\n" + stitched)
 }
