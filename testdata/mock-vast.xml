@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<VAST version="4.2">
+  <Ad id="ad-001">
+    <InLine>
+      <AdSystem>SSAI Mock Ad Server</AdSystem>
+      <AdTitle>Test Advertisement</AdTitle>
+
+      <Impression>
+        https://tracking.example.com/impression?ad=ad-001
+      </Impression>
+
+      <Creatives>
+        <Creative>
+          <Linear>
+            <Duration>00:00:06</Duration>
+
+            <TrackingEvents>
+              <Tracking event="start">https://tracking.example.com/start?ad=ad-001</Tracking>
+              <Tracking event="firstQuartile">https://tracking.example.com/q1?ad=ad-001</Tracking>
+              <Tracking event="midpoint">https://tracking.example.com/q2?ad=ad-001</Tracking>
+              <Tracking event="thirdQuartile">https://tracking.example.com/q3?ad=ad-001</Tracking>
+              <Tracking event="complete">https://tracking.example.com/complete?ad=ad-001</Tracking>
+            </TrackingEvents>
+
+            <MediaFiles>
+              <MediaFile
+                delivery="progressive"
+                type="video/mp4"
+                width="1280"
+                height="720">
+                http://localhost:8080/ads/ad-001.mp4
+              </MediaFile>
+            </MediaFiles>
+          </Linear>
+        </Creative>
+      </Creatives>
+    </InLine>
+  </Ad>
+</VAST>

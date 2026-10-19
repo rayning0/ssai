@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
 	"github.com/rayning0/ssai/internal/hls"
 	"github.com/rayning0/ssai/internal/ssai"
@@ -66,4 +67,63 @@ func main() {
 		len(channel.Segments),
 		channel.LastSequence,
 	)
+
+	vastXML, err := os.ReadFile("testdata/mock-vast.xml")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	ads, err := ssai.ParseVAST(vastXML)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	adServer := &ssai.MockAdServer{Ads: ads}
+
+	var breakID string
+
+	for id := range channel.AdBreaks {
+		breakID = id
+		break
+	}
+
+	if breakID == "" {
+		log.Fatal("no ad break found")
+	}
+
+	for _, remaining := range []time.Duration{
+		90 * time.Second,
+		8 * time.Second,
+		3 * time.Second,
+	} {
+		decision, err := adServer.Decide(ssai.AdRequest{
+			SessionID:         "viewer123",
+			BreakID:           breakID,
+			RemainingDuration: remaining,
+		})
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		fmt.Printf(
+			"Remaining=%s selectedAds=%d\n",
+			remaining,
+			len(decision.Ads),
+		)
+
+		for _, ad := range decision.Ads {
+			fmt.Printf(
+				"  Ad=%s duration=%s media=%s\n",
+				ad.ID,
+				ad.Duration,
+				ad.MediaURL,
+			)
+
+			fmt.Printf(
+				"  Impressions=%v\n  Tracking=%v\n",
+				ad.Impressions,
+				ad.TrackingURLs,
+			)
+		}
+	}
 }
